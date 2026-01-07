@@ -12,7 +12,31 @@
 // 5. Server will run on http://localhost:3000
 
 // Load environment variables for security
-require('dotenv').config();
+// Load environment variables from the SAME directory as this script
+const path = require('path');
+const fs = require('fs');
+
+// Try standard dotenv
+const envPath = path.resolve(__dirname, '.env');
+require('dotenv').config({ path: envPath });
+
+// Fallback: If dotenv found nothing (likely encoding issue), read manual
+if (!process.env.GEMINI_API_KEY) {
+    try {
+        if (fs.existsSync(envPath)) {
+            console.log('⚠️ Standard dotenv failed. Attempting manual read...');
+            const raw = fs.readFileSync(envPath, 'utf8');
+            // Simple manual parse for GEMINI_API_KEY
+            const match = raw.match(/GEMINI_API_KEY\s*=\s*(.*)/);
+            if (match && match[1]) {
+                process.env.GEMINI_API_KEY = match[1].trim();
+                console.log('✅ Manually loaded GEMINI_API_KEY');
+            }
+        }
+    } catch (e) {
+        console.error('Manual read failed:', e);
+    }
+}
 
 const express = require('express');
 const cors = require('cors');
@@ -22,9 +46,15 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // CONFIGURATION
 // ============================================
 
-// TODO: Replace this with your actual Google Gemini API key
-// API Key loaded from environment variable (.env file locally, or hosting settings in production)
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyDehL83iwvOe_PsYbuL4hs63XaXYU16Kas';
+// API Key loaded EXCLUSIVELY from environment variables for security.
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+// Fail fast if key is not found (prevents crash later)
+if (!GEMINI_API_KEY) {
+    console.error('CRITICAL ERROR: GEMINI_API_KEY is not set in environment variables!');
+    console.error('Please ensure your .env file has the key.');
+    process.exit(1);
+}
 
 const PORT = process.env.PORT || 3000;
 
